@@ -1,0 +1,995 @@
+const STORAGE_KEY = "webLibraryAkiraRen_v1";
+const LOCAL_IMAGE_FALLBACK = "imagen-respaldo-biblioteca.png";
+
+const defaultData = {
+  links: [
+    {id:"demo1", title:"YouTube", description:"Ejemplo de página guardada en la biblioteca.", platform:"YouTube", category:"Películas y Series", url:"https://www.youtube.com/", image:"", tags:["video"], favorite:false, createdAt:Date.now()-120000, lastOpened:Date.now()-120000},
+    {id:"demo2", title:"ChatGPT", description:"Ejemplo de herramienta de IA.", platform:"Otros", category:"Imperio", url:"https://chatgpt.com/", image:"", tags:["IA"], favorite:true, createdAt:Date.now()-720000, lastOpened:Date.now()-720000},
+    {id:"demo3", title:"GitHub", description:"Repositorios y proyectos de programación.", platform:"GitHub", category:"Historia", url:"https://github.com/", image:"", tags:["codigo"], favorite:false, createdAt:Date.now()-3600000, lastOpened:Date.now()-3600000}
+  ],
+  images: [],
+  music: {
+    intro: "Tu biblioteca musical guardada directamente desde el dispositivo.",
+    collections: [{id:"music-akira",name:"Akira Ren OST",icon:"♫",description:"Música y bandas sonoras de Akira Ren."}],
+    items: []
+  },
+  imageCollections: [
+    {id:"akira-ren", name:"Akira Ren", icon:"👤", description:"Imágenes exclusivas de Akira Ren."},
+    {id:"sofia", name:"Sofía", icon:"👤", description:"Imágenes exclusivas de Sofía."}
+  ],
+  customCategories: [],
+  history: {
+    intro: "Esta es la historia de Akira Ren: su origen, evolución, capítulos, sagas, temporadas y cada etapa que construye su legado.",
+    menus: [
+      {id:"hist-root-sagas", name:"Sagas", type:"Saga", icon:"📚", description:"Sagas principales de la historia."},
+      {id:"hist-root-temporadas", name:"Temporadas", type:"Temporada", icon:"🎬", description:"Temporadas y grandes etapas."}
+    ],
+    items: []
+  },
+  empire: {
+    intro: "Un sistema extraordinario convirtió a Akira Ren en una figura poderosa y millonaria, permitiéndole construir un imperio de empresas, hoteles, islas y propiedades.",
+    items: []
+  },
+  empireMeta: { edits: {}, deleted: [] },
+  profile: {
+    name: "Akira Ren",
+    subtitle: "Guardián Nocturno · Soberano de tu mundo digital 👑",
+    biography: "Akira Ren es la identidad central de WEB LIBRARY: un personaje construido alrededor del conocimiento, la estrategia, la tecnología y una evolución sin límite. Esta ficha reúne su historia, atributos, poderes, habilidades, características, equipo, relaciones y cualquier nuevo dato que quieras agregar.\n\nLa biblioteca funciona como un archivo vivo del personaje: puedes editar cada apartado, sustituir su imagen, agregar fotografías y ampliar la información indefinidamente.",
+    title: "Guardián Nocturno",
+    titleDescription: "El conocimiento es la llave que abre todos los mundos.",
+    libraryDescription: "Perfil digital y archivo personal de Akira Ren.",
+    characterImage: "Akira Ren - Ficha del Personaje.png",
+    identity: { level:"47", className:"Asesino / Estratega", age:"19", species:"Humano / Evolución desconocida", alignment:"Guardián independiente" },
+    stats: [
+      {name:"Fuerza",value:85},{name:"Velocidad",value:92},{name:"Inteligencia",value:97},{name:"Resistencia",value:90},
+      {name:"Percepción",value:94},{name:"Energía",value:96},{name:"Serenidad",value:78},{name:"Suerte",value:88}
+    ],
+    powers: ["Dominio de las sombras","Percepción nocturna","Estrategia avanzada","Adaptación y evolución","Control de energía","Regeneración y resistencia","Desarrollo de habilidades sin límite"],
+    skills: ["Paso Nocturno","Análisis táctico","Combate estratégico","Infiltración","Concentración absoluta","Lectura del entorno","Aprendizaje acelerado"],
+    characteristics: ["Tranquilo","Observador","Estratégico","Resiliente","Independiente","Protector","Ambicioso","En constante evolución"],
+    life: ["Infancia y origen","Despertar de habilidades","Entrenamiento","Primeras misiones","Construcción de su legado","Etapa actual: evolución continua"],
+    equipment: ["Armadura nocturna","Anillo de las Sombras","Armas estratégicas","Dispositivos tecnológicos","Sistema de información"],
+    achievements: ["Superar sus propios límites","Dominar múltiples habilidades","Construir un archivo de conocimiento","Convertir la información en poder","Mantener una evolución constante"],
+    relationships: [],
+    customSections: [],
+    photos: []
+  }
+};
+
+let data = loadData();
+let currentView = "home";
+let currentCategory = null;
+let pendingLinkImage = "";
+let pendingGalleryImage = "";
+let pendingProfilePhoto = "";
+let currentImageCollectionId = null;
+let currentHistoryMenuId = null;
+let pendingHistoryImage = "";
+let pendingEmpireImage = "";
+let pendingMusicFile = "";
+let currentMusicCollectionId = null;
+
+window.addEventListener("message", (event)=>{
+  if(event.data?.type === "AKIRA_EMPIRE_UPDATED" && event.data.empireMeta){
+    data.empireMeta = event.data.empireMeta;
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(createStorageSafeData(data))); }catch{}
+  }
+});
+
+function loadData(){
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if(!saved) return structuredClone(defaultData);
+    const parsed=JSON.parse(saved);
+    const merged={...structuredClone(defaultData), ...parsed, profile:{...structuredClone(defaultData.profile), ...(parsed.profile||{})}};
+    if(!Array.isArray(merged.imageCollections) || !merged.imageCollections.length) merged.imageCollections=structuredClone(defaultData.imageCollections);
+    merged.imageCollections=merged.imageCollections.map(c=>({...c,icon:c.icon||"👤"}));
+    if(!Array.isArray(merged.images)) merged.images=[];
+    merged.music={...structuredClone(defaultData.music),...(parsed.music||{})};
+    merged.music.collections=Array.isArray(merged.music.collections)?merged.music.collections:structuredClone(defaultData.music.collections);
+    merged.music.items=Array.isArray(merged.music.items)?merged.music.items:[];
+    merged.history={...structuredClone(defaultData.history),...(parsed.history||{})};
+    merged.history.menus=Array.isArray(merged.history.menus)?merged.history.menus:structuredClone(defaultData.history.menus);
+    merged.history.items=Array.isArray(merged.history.items)?merged.history.items:[];
+    merged.empire={...structuredClone(defaultData.empire),...(parsed.empire||{})};
+    merged.empire.items=Array.isArray(merged.empire.items)?merged.empire.items:[];
+    // Rename only the two categories requested by the user while keeping existing entries.
+    merged.links=(merged.links||[]).map(x=>({...x,category:x.category==="Tecnología"?"Historia":x.category==="Productividad"?"Imperio":x.category}));
+    return merged;
+  } catch(e){ return structuredClone(defaultData); }
+}
+const IMAGE_DB_NAME = "AkiraRenImageDB";
+const IMAGE_DB_STORE = "images";
+
+function openImageDB(){
+  return new Promise((resolve,reject)=>{
+    if(!window.indexedDB) return reject(new Error("IndexedDB no disponible"));
+    const req=indexedDB.open(IMAGE_DB_NAME,1);
+    req.onupgradeneeded=()=>{ if(!req.result.objectStoreNames.contains(IMAGE_DB_STORE)) req.result.createObjectStore(IMAGE_DB_STORE); };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error||new Error("No se pudo abrir el almacenamiento de imágenes"));
+  });
+}
+async function putStoredImage(key,value){
+  const db=await openImageDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(IMAGE_DB_STORE,"readwrite");
+    tx.objectStore(IMAGE_DB_STORE).put(value,key);
+    tx.oncomplete=()=>{db.close();resolve();};
+    tx.onerror=()=>{db.close();reject(tx.error||new Error("No se pudo guardar la imagen"));};
+  });
+}
+async function getStoredImage(key){
+  try{
+    const db=await openImageDB();
+    return await new Promise((resolve,reject)=>{
+      const tx=db.transaction(IMAGE_DB_STORE,"readonly"), req=tx.objectStore(IMAGE_DB_STORE).get(key);
+      req.onsuccess=()=>{db.close();resolve(req.result||"");};
+      req.onerror=()=>{db.close();reject(req.error);};
+    });
+  }catch{return "";}
+}
+
+function imageStorageKey(section,id,field="image"){
+  return `akira-ren:${section}:${id||crypto.randomUUID()}:${field}`;
+}
+
+async function prepareLocalStorageData(source){
+  const copy=structuredClone(source);
+  const tasks=[];
+  const storeField=(obj,field,key)=>{
+    if(!obj || typeof obj[field] !== "string" || !obj[field].startsWith("data:image/")) return;
+    const value=obj[field];
+    const storageKey=key || imageStorageKey("misc",crypto.randomUUID(),field);
+    tasks.push(putStoredImage(storageKey,value));
+    obj[field]=`idb-image:${storageKey}`;
+  };
+  (copy.links||[]).forEach(x=>storeField(x,"image",imageStorageKey("link",x.id,"image")));
+  (copy.images||[]).forEach(x=>{
+    storeField(x,"url",imageStorageKey("gallery",x.id,"url"));
+    storeField(x,"image",imageStorageKey("gallery",x.id,"image"));
+  });
+  (copy.history?.items||[]).forEach(x=>storeField(x,"image",imageStorageKey("history",x.id,"image")));
+  (copy.music?.items||[]).forEach(x=>storeField(x,"url",imageStorageKey("music",x.id,"url")));
+  (copy.empire?.items||[]).forEach(x=>storeField(x,"image",imageStorageKey("empire",x.id,"image")));
+  (copy.profile?.photos||[]).forEach(x=>storeField(x,"image",imageStorageKey("profile-photo",x.id,"image")));
+  if(typeof copy.profile?.characterImage === "string" && copy.profile.characterImage.startsWith("data:image/"))
+    storeField(copy.profile,"characterImage",imageStorageKey("profile","character","characterImage"));
+  await Promise.all(tasks);
+  return copy;
+}
+
+async function hydrateStoredImages(obj){
+  const tasks=[];
+  const restore=(target,field)=>{
+    const value=target?.[field];
+    if(typeof value!=="string" || !value.startsWith("idb-image:")) return;
+    const key=value.slice("idb-image:".length);
+    tasks.push(getStoredImage(key).then(img=>{if(img) target[field]=img;}));
+  };
+  (obj.links||[]).forEach(x=>restore(x,"image"));
+  (obj.images||[]).forEach(x=>{restore(x,"url");restore(x,"image");});
+  (obj.history?.items||[]).forEach(x=>restore(x,"image"));
+  (obj.music?.items||[]).forEach(x=>restore(x,"url"));
+  (obj.empire?.items||[]).forEach(x=>restore(x,"image"));
+  (obj.profile?.photos||[]).forEach(x=>restore(x,"image"));
+  restore(obj.profile,"characterImage");
+  await Promise.all(tasks);
+  return obj;
+}
+
+function createStorageSafeData(source){
+  const copy=structuredClone(source);
+  const strip=(obj,field)=>{
+    if(typeof obj?.[field] === "string" && obj[field].startsWith("data:image/")) obj[field]="";
+  };
+  (copy.links||[]).forEach(x=>strip(x,"image"));
+  (copy.images||[]).forEach(x=>{strip(x,"url");strip(x,"image");});
+  (copy.history?.items||[]).forEach(x=>strip(x,"image"));
+  (copy.music?.items||[]).forEach(x=>strip(x,"url"));
+  (copy.empire?.items||[]).forEach(x=>strip(x,"image"));
+  (copy.profile?.photos||[]).forEach(x=>strip(x,"image"));
+  strip(copy.profile,"characterImage");
+  return copy;
+}
+
+async function save(){
+  try{
+    const safe=await prepareLocalStorageData(data);
+    const serialized=JSON.stringify(safe);
+    try{
+      localStorage.setItem(STORAGE_KEY+"_previous",localStorage.getItem(STORAGE_KEY)||serialized);
+    }catch(e){
+      try{localStorage.removeItem(STORAGE_KEY+"_previous");localStorage.setItem(STORAGE_KEY+"_previous",serialized);}catch{}
+    }
+    try{
+      localStorage.setItem(STORAGE_KEY,serialized);
+    }catch(e){
+      const lighter=createStorageSafeData(safe);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(lighter));
+    }
+    if(window.WLCloud?.enabled){
+      // La nube es la fuente compartida: cada imagen/audio local se sube primero
+      // a Supabase Storage y después se guarda la URL pública en la biblioteca.
+      const cloudSource=structuredClone(data);
+      await window.WLCloud.save(cloudSource);
+      console.info("WEB LIBRARY: sincronizado con Supabase.");
+    }
+    return true;
+  }catch(e){
+    console.error(e);
+    alert("No se pudo guardar la información. La imagen se mantiene en el almacenamiento del navegador; prueba nuevamente o exporta una copia de seguridad.");
+    return false;
+  }
+}
+
+async function initializeCloud(){
+  if(!window.WLCloud?.enabled) return;
+  try{
+    const cloudData=await window.WLCloud.load();
+    if(cloudData){
+      data={...structuredClone(defaultData),...cloudData,profile:{...structuredClone(defaultData.profile),...(cloudData.profile||{})}};
+      if(!Array.isArray(data.imageCollections) || !data.imageCollections.length) data.imageCollections=structuredClone(defaultData.imageCollections);
+      data.imageCollections=data.imageCollections.map(c=>({...c,icon:c.icon||"👤"}));
+      if(!Array.isArray(data.images)) data.images=[];
+      data.music={...structuredClone(defaultData.music),...(data.music||{})}; data.music.collections=Array.isArray(data.music.collections)?data.music.collections:structuredClone(defaultData.music.collections); data.music.items=Array.isArray(data.music.items)?data.music.items:[];
+      data.history={...structuredClone(defaultData.history),...(data.history||{})}; data.history.menus=Array.isArray(data.history.menus)?data.history.menus:structuredClone(defaultData.history.menus); data.history.items=Array.isArray(data.history.items)?data.history.items:[];
+      data.empire={...structuredClone(defaultData.empire),...(data.empire||{})}; data.empire.items=Array.isArray(data.empire.items)?data.empire.items:[];
+      data.links=(data.links||[]).map(x=>({...x,category:x.category==="Tecnología"?"Historia":x.category==="Productividad"?"Imperio":x.category}));
+      prepareLocalStorageData(data).then(safe=>{ try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(safe)); }catch{}; return hydrateStoredImages(data); }).then(()=>{ if(currentView !== "home") renderView(); });
+      console.info("WEB LIBRARY: datos cargados desde Supabase.");
+    }else{
+      await window.WLCloud.save(data);
+    }
+  }catch(err){
+    console.warn("WEB LIBRARY: Supabase no disponible; se mantiene el modo local.",err);
+  }
+}
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+function showWorkspace(view, category=null){
+  currentView = view; currentCategory = category;
+  if(category !== "Imágenes") currentImageCollectionId = null;
+  $("#home").classList.toggle("hidden", view !== "home");
+  $("#workspace").classList.toggle("hidden", view === "home");
+  if(view === "home") return;
+  const titles = {
+    categories:"Categorías", favorites:"Favoritos", recents:"Páginas recientes",
+    settings:"Configuración"
+  };
+  $("#workspaceTitle").textContent = category ? `Categoría: ${category}` : (titles[view] || "Biblioteca");
+  $("#globalSearch").value = "";
+  $("#typeFilter").value = "all"; $("#platformFilter").value = "all";
+  renderView();
+}
+
+function escapeHtml(s=""){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+function safeUrl(u){
+  try { const x = new URL(u); return ["http:","https:"].includes(x.protocol) ? x.href : "#"; }
+  catch { return "#"; }
+}
+function renderView(){
+  if(currentView === "settings") return renderSettings();
+  if(currentView === "categories") return renderCategories();
+
+  // Módulos especiales de la biblioteca.
+  if(currentCategory === "Imágenes") return renderImagesGallery();
+  if(currentCategory === "Música") return renderMusicLibrary();
+  if(currentCategory === "Historia") return renderHistory();
+  if(currentCategory === "Imperio") return renderEmpire();
+
+  let items = [];
+  if(currentView === "favorites") items = data.links.filter(x=>x.favorite);
+  else if(currentView === "recents") items = [...data.links].sort((a,b)=>(b.lastOpened||b.createdAt)-(a.lastOpened||a.createdAt));
+  else items = data.links.filter(x=>!currentCategory || x.category === currentCategory);
+
+  const q = $("#globalSearch").value.trim().toLowerCase();
+  const type = $("#typeFilter").value;
+  const platform = $("#platformFilter").value;
+  items = items.filter(x=>{
+    const hay = [x.title,x.description,x.platform,x.category,...(x.tags||[])].join(" ").toLowerCase();
+    return (!q || hay.includes(q)) && (platform==="all" || x.platform===platform) && (type==="all" || type==="link");
+  });
+
+  $("#content").innerHTML = `
+    <div class="section-head">
+      <div><h2>${escapeHtml(currentCategory || (currentView==="favorites"?"⭐ Favoritos":"🔗 Biblioteca"))}</h2>
+      <p>${items.length} elemento(s) encontrado(s).</p></div>
+      <button class="primary-btn" data-action="add-link">＋ Agregar página</button>
+    </div>
+    <div class="cards">${items.length ? items.map(linkCard).join("") : emptyState("No hay páginas aquí todavía.","Agrega un enlace y aparecerá en tu biblioteca.")}</div>
+  `;
+}
+function renderImagesGallery(){
+  const q = $("#globalSearch").value.trim().toLowerCase();
+  const collections = data.imageCollections || [];
+  const active = collections.find(c=>c.id===currentImageCollectionId) || null;
+  let items = (data.images || []).filter(x => {
+    const inCollection = active ? x.collectionId === active.id : true;
+    const hay = [x.title, x.description, x.category, x.collectionName].join(" ").toLowerCase();
+    return inCollection && (!q || hay.includes(q));
+  });
+
+  if(!active){
+    $("#content").innerHTML = `
+      <div class="section-head">
+        <div><h2>🖼️ Imágenes</h2><p>Crea menús independientes para cada persona o colección.</p></div>
+        <button class="primary-btn" data-action="new-image-collection">＋ Nuevo menú</button>
+      </div>
+      <div class="category-grid image-collection-grid">
+        ${collections.map(c=>`<div class="image-menu-card"><button type="button" class="image-menu-open" data-image-collection="${escapeHtml(c.id)}"><div class="icon">${escapeHtml(c.icon||"👤")}</div><h3>${escapeHtml(c.name)}</h3><p>${escapeHtml(c.description||"Solo muestra las imágenes de esta colección.")}</p><small>${data.images.filter(x=>x.collectionId===c.id).length} imagen(es)</small></button><div class="image-menu-actions"><button class="small-btn" data-image-collection-edit="${escapeHtml(c.id)}">Editar</button><button class="small-btn danger" data-image-collection-delete="${escapeHtml(c.id)}">Eliminar</button></div></div>`).join("")}
+      </div>
+      <div style="height:18px"></div>
+      <div class="section-head">
+        <div><h3>📦 Imágenes sin menú</h3><p>Fotos antiguas o que todavía no has asignado a una colección.</p></div>
+        <button class="primary-btn" data-action="add-image">＋ Agregar imagen</button>
+      </div>
+      <div class="cards image-gallery-cards">${(data.images.filter(x=>!x.collectionId).length) ? data.images.filter(x=>!x.collectionId).map(imageCard).join("") : emptyState("No hay imágenes sin menú.","Crea un menú y asígnale cada fotografía.")}</div>
+    `;
+    return;
+  }
+
+  $("#content").innerHTML = `
+    <div class="section-head">
+      <div><button class="small-btn" data-action="back-image-menus">← Menús</button><h2>👤 ${escapeHtml(active.name)}</h2><p>${items.length} imagen(es) de esta colección.</p></div>
+      <button class="primary-btn" data-action="add-image">＋ Agregar imagen</button>
+    </div>
+    <div class="cards image-gallery-cards">${items.length ? items.map(imageCard).join("") : emptyState(`No hay imágenes de ${escapeHtml(active.name)}.`,`Agrega una imagen y quedará guardada exclusivamente en este menú.`)}</div>
+  `;
+}
+
+function renderHistory(){
+  const h=data.history||defaultData.history;
+  h.menus=Array.isArray(h.menus)?h.menus:[];
+  const active=h.menus.find(m=>m.id===currentHistoryMenuId)||null;
+  const q=$("#globalSearch").value.trim().toLowerCase();
+  const childMenus=active?h.menus.filter(m=>m.parentId===active.id):h.menus.filter(m=>!m.parentId);
+  const items=(h.items||[]).filter(x=>{
+    const inMenu=active ? x.menuId===active.id : !x.menuId;
+    const hay=[x.type,x.title,x.description].join(" ").toLowerCase();
+    return inMenu && (!q||hay.includes(q));
+  });
+  const total=(h.items||[]).length;
+  const heading=active ? `${active.icon||"📜"} ${active.name}` : "📜 Historia de Akira Ren";
+  const parentButton=active ? `<button class="small-btn" data-action="back-history-menu">← Menús</button>` : "";
+  const menuCards=childMenus.map(m=>{
+    const count=h.items.filter(x=>x.menuId===m.id).length;
+    return `<div class="history-menu-card"><button class="history-menu-open" data-history-menu="${escapeHtml(m.id)}"><div class="icon">${escapeHtml(m.icon||"📁")}</div><h3>${escapeHtml(m.name)}</h3><p>${escapeHtml(m.description||"Menú de historia")}</p><small>${count} elemento(s)</small></button><div class="history-menu-actions"><button class="small-btn" data-history-menu-edit="${escapeHtml(m.id)}">Editar</button><button class="small-btn danger" data-history-menu-delete="${escapeHtml(m.id)}">Eliminar</button></div></div>`;
+  }).join("");
+  const cards=items.map(historyCard).join("");
+  $("#content").innerHTML=`
+    <div class="special-hero history-hero"><div><span class="special-kicker">📜 ARCHIVO HISTÓRICO</span><h2>${escapeHtml(heading)}</h2><p>${escapeHtml(h.intro||"")}</p></div><div class="special-actions"><button class="primary-btn" data-action="new-history-menu">＋ ${active?"Nuevo submenú":"Nuevo menú"}</button><button class="small-btn" data-action="add-history">＋ Capítulo / elemento</button></div></div>
+    <div class="special-toolbar"><span>${total} registro(s) en toda la historia</span><div class="toolbar-actions">${parentButton}<button class="small-btn" data-action="edit-history-intro">✏️ Editar descripción</button></div></div>
+    ${menuCards?`<div class="category-grid history-menu-grid">${menuCards}</div>`:""}
+    <div class="section-head"><div><h3>${active?"Elementos de este menú":"Elementos sin menú"}</h3><p>${active?`Contenido exclusivo de ${escapeHtml(active.name)}.`:"Los elementos sin menú aparecen aquí hasta que los organices."}</p></div></div>
+    <div class="cards special-grid">${cards||emptyState(active?`No hay elementos en ${escapeHtml(active.name)}.`:"No hay elementos fuera de un menú.","Puedes crear capítulos, sagas, temporadas y otros elementos.")}</div>`;
+}
+function historyCard(x){return `<article class="card special-card">${x.image?`<div class="card-cover" style="background-image:url('${escapeHtml(x.image)}'),url('${LOCAL_IMAGE_FALLBACK}');background-size:cover;background-position:center"></div>`:`<div class="special-placeholder">📜</div>`}<div class="card-body"><span class="badge">${escapeHtml(x.type||"Historia")}</span><h3>${escapeHtml(x.title)}</h3><p>${escapeHtml(x.description||"Sin descripción.")}</p><div class="card-actions"><button class="small-btn" data-history-edit="${escapeHtml(x.id)}">Editar</button><button class="small-btn danger" data-history-delete="${escapeHtml(x.id)}">Eliminar</button></div></div></article>`}
+function openHistoryMenu(id){ currentHistoryMenuId=id; showWorkspace("category","Historia"); }
+function openHistoryMenuModal(id=null){
+  const m=(data.history.menus||[]).find(x=>x.id===id);
+  $("#historyMenuModal").classList.remove("hidden"); $("#historyMenuModalTitle").textContent=id?"Editar menú de historia":(currentHistoryMenuId?"Nuevo submenú":"Nuevo menú de historia");
+  $("#historyMenuEditId").value=id||""; $("#historyMenuTitle").value=m?.name||""; $("#historyMenuIcon").value=m?.icon||"📁"; $("#historyMenuDescription").value=m?.description||"";
+}
+function deleteHistoryMenu(id){
+  const m=(data.history.menus||[]).find(x=>x.id===id); if(!m)return;
+  if((data.history.menus||[]).some(x=>x.parentId===id)){alert("No puedes eliminar este menú mientras tenga menús dentro. Elimina o mueve primero sus submenús.");return;}
+  if((data.history.items||[]).some(x=>x.menuId===id)){alert("Este menú contiene elementos. Muévelos o elimínalos antes de borrar el menú.");return;}
+  if(!confirm(`¿Eliminar el menú “${m.name}”?`))return;
+  data.history.menus=data.history.menus.filter(x=>x.id!==id); if(currentHistoryMenuId===id)currentHistoryMenuId=null; save(); renderHistory();
+}
+function openHistoryModal(id=null){
+  const x=(data.history?.items||[]).find(a=>a.id===id); const h=data.history||defaultData.history;
+  $("#historyModal").classList.remove("hidden"); $("#historyModalTitle").textContent=id?"Editar elemento de la historia":"Agregar elemento de la historia";
+  $("#historyEditId").value=id||""; $("#historyType").value=x?.type||"Capítulo"; $("#historyTitle").value=x?.title||""; $("#historyDescription").value=x?.description||"";
+  $("#historyMenuSelect").innerHTML=`<option value="">Sin menú</option>`+(h.menus||[]).map(m=>`<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)}</option>`).join("");
+  $("#historyMenuSelect").value=x?.menuId||currentHistoryMenuId||"";
+  pendingHistoryImage=x?.image||""; $("#historyImageFile").value=""; setPreview("#historyImagePreview",pendingHistoryImage);
+}
+function renderEmpire(){
+  $("#content").innerHTML=`
+    <div class="special-hero empire-hero">
+      <div>
+        <span class="special-kicker">IMPERIO AKIRA REN</span>
+        <h2>Imperio Akira Ren</h2>
+        <p>Contenido completo del archivo Imperio Akira Ren, integrado tal como estaba en su página original.</p>
+      </div>
+      <div class="special-actions">
+        
+      </div>
+    </div>
+    <div class="imperio-integrated-frame-wrap">
+      <iframe id="imperioIntegratedFrame" class="imperio-integrated-frame" src="imperio-akira-ren.html" title="Imperio Akira Ren"></iframe>
+    </div>
+  `;
+  const frame=$("#imperioIntegratedFrame");
+  frame.addEventListener("load",()=>{
+    try{
+      const doc=frame.contentDocument;
+      const height=Math.max(
+        doc.body ? doc.body.scrollHeight : 0,
+        doc.documentElement ? doc.documentElement.scrollHeight : 0,
+        window.innerHeight
+      );
+      frame.style.height=Math.max(900,height+40)+"px";
+    }catch(e){
+      frame.style.height="calc(100vh - 150px)";
+    }
+  });
+}
+function editHistoryIntro(){
+  const value=prompt("Descripción inicial de la historia de Akira Ren:",data.history?.intro||"");
+  if(value===null)return; data.history.intro=value.trim()||defaultData.history.intro; save(); renderHistory();
+}
+function editEmpireIntro(){
+  const value=prompt("Descripción inicial del sistema y del Imperio:",data.empire?.intro||"");
+  if(value===null)return; data.empire.intro=value.trim()||defaultData.empire.intro; save(); renderEmpire();
+}
+function openHistoryModal(id=null){
+  const x=(data.history?.items||[]).find(a=>a.id===id);
+  $("#historyModal").classList.remove("hidden"); $("#historyModalTitle").textContent=id?"Editar elemento de la historia":"Agregar elemento de la historia";
+  $("#historyEditId").value=id||""; $("#historyType").value=x?.type||"Capítulo"; $("#historyTitle").value=x?.title||""; $("#historyDescription").value=x?.description||"";
+  pendingHistoryImage=x?.image||""; $("#historyImageFile").value=""; setPreview("#historyImagePreview",pendingHistoryImage);
+}
+function openEmpireModal(id=null){
+  const x=(data.empire?.items||[]).find(a=>a.id===id);
+  $("#empireModal").classList.remove("hidden"); $("#empireModalTitle").textContent=id?"Editar elemento del Imperio":"Agregar elemento del Imperio";
+  $("#empireEditId").value=id||""; $("#empireType").value=x?.type||"Empresa"; $("#empireTitle").value=x?.title||""; $("#empireDescription").value=x?.description||"";
+  pendingEmpireImage=x?.image||""; $("#empireImageFile").value=""; setPreview("#empireImagePreview",pendingEmpireImage);
+}
+function setPreview(selector,src){const el=$(selector); if(src){el.src=src;el.classList.remove("hidden");}else{el.removeAttribute("src");el.classList.add("hidden");}}
+function deleteHistoryItem(id){if(!confirm("¿Eliminar este elemento de la historia?"))return;data.history.items=data.history.items.filter(x=>x.id!==id);save();renderHistory();}
+function deleteEmpireItem(id){if(!confirm("¿Eliminar este elemento del Imperio?"))return;data.empire.items=data.empire.items.filter(x=>x.id!==id);save();renderEmpire();}
+
+function closeModals(){ $$(".modal").forEach(m=>m.classList.add("hidden")); }
+
+
+function fileToDataUrl(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error("No se pudo leer el archivo"));r.readAsDataURL(file);});}
+function compressImage(file, maxSize=1400, quality=0.82){
+  return new Promise((resolve,reject)=>{
+    if(!file || !file.type.startsWith("image/")) return reject(new Error("Archivo no válido"));
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        let w=img.width, h=img.height;
+        const scale=Math.min(1,maxSize/Math.max(w,h));
+        w=Math.round(w*scale); h=Math.round(h*scale);
+        const canvas=document.createElement("canvas");
+        canvas.width=w; canvas.height=h;
+        const ctx=canvas.getContext("2d");
+        ctx.drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL("image/jpeg",quality));
+      };
+      img.onerror=()=>reject(new Error("No se pudo leer la imagen"));
+      img.src=reader.result;
+    };
+    reader.onerror=()=>reject(new Error("No se pudo leer el archivo"));
+    reader.readAsDataURL(file);
+  });
+}
+
+$("#linkImageFile").addEventListener("change", async e=>{
+  const file=e.target.files[0];
+  if(!file) return;
+  try{
+    pendingLinkImage=await compressImage(file);
+    $("#linkImagePreview").src=pendingLinkImage;
+    $("#linkImagePreview").classList.remove("hidden");
+  }catch(err){ alert("No se pudo cargar esa imagen."); }
+});
+
+$("#imageFile").addEventListener("change", async e=>{
+  const file=e.target.files[0];
+  if(!file) return;
+  try{
+    pendingGalleryImage=await compressImage(file);
+    $("#imagePreview").src=pendingGalleryImage;
+    $("#imagePreview").classList.remove("hidden");
+  }catch(err){ alert("No se pudo cargar esa imagen."); }
+});
+
+$("#historyImageFile").addEventListener("change", async e=>{const file=e.target.files[0];if(!file)return;try{pendingHistoryImage=await compressImage(file);setPreview("#historyImagePreview",pendingHistoryImage);}catch{alert("No se pudo cargar esa imagen.");}});
+$("#empireImageFile").addEventListener("change", async e=>{const file=e.target.files[0];if(!file)return;try{pendingEmpireImage=await compressImage(file);setPreview("#empireImagePreview",pendingEmpireImage);}catch{alert("No se pudo cargar esa imagen.");}});
+
+// Enlaces directos de la portada: además de la delegación global, cada zona
+// queda conectada al cargar la página. Esto evita que una capa visual o un
+// cambio dinámico impida responder a los botones transparentes.
+function bindHomeHotspots(){
+  document.querySelectorAll(".exact-hotspots .hotspot").forEach(btn=>{
+    if(btn.dataset.homeBound === "1") return;
+    btn.dataset.homeBound = "1";
+    btn.addEventListener("click", function(ev){
+      ev.preventDefault();
+      ev.stopPropagation();
+      const view=this.dataset.view;
+      const filter=this.dataset.filter;
+      const action=this.dataset.action;
+      if(view){ showWorkspace(view); return; }
+      if(filter){ showWorkspace("category", filter); return; }
+      if(action === "open-profile"){ openProfile(); return; }
+    });
+  });
+}
+
+bindHomeHotspots();
+
+document.addEventListener("click", e=>{
+  const target = e.target instanceof Element ? e.target : null;
+  if(!target) return;
+
+  // Todos los controles de la biblioteca usan delegación para que también
+  // funcionen los botones creados dinámicamente después de cada render.
+  const view = target.closest("[data-view]")?.dataset.view;
+  if(view){
+    e.preventDefault();
+    showWorkspace(view);
+    return;
+  }
+
+  const filter = target.closest("[data-filter]")?.dataset.filter;
+  if(filter){
+    e.preventDefault();
+    showWorkspace("category", filter);
+    return;
+  }
+
+  const category = target.closest("[data-category]")?.dataset.category;
+  if(category){
+    e.preventDefault();
+    showWorkspace("category", category);
+    return;
+  }
+
+  const platform = target.closest("[data-platform]")?.dataset.platform;
+  if(platform){
+    e.preventDefault();
+    showWorkspace("recents");
+    $("#platformFilter").value=platform;
+    renderView();
+    return;
+  }
+
+  const action = target.closest("[data-action]")?.dataset.action;
+  if(action){
+    e.preventDefault();
+    switch(action){
+      case "add-link": openLinkModal(); return;
+      case "add-image": openImageModal(); return;
+      case "add-music": openMusicModal(); return;
+      case "new-music-menu": openMusicCollectionModal(); return;
+      case "back-music-menus": currentMusicCollectionId=null; renderMusicLibrary(); return;
+      case "new-image-collection": createImageCollection(); return;
+      case "new-history-menu": openHistoryMenuModal(); return;
+      case "back-history-menu": currentHistoryMenuId=null; renderHistory(); return;
+      case "add-history": openHistoryModal(); return;
+      case "add-empire": openEmpireModal(); return;
+      case "edit-history-intro": editHistoryIntro(); return;
+      case "edit-empire-intro": editEmpireIntro(); return;
+      case "back-image-menus": currentImageCollectionId=null; renderImagesGallery(); return;
+      case "close-modal": closeModals(); return;
+      case "focus-search":
+        showWorkspace("recents");
+        setTimeout(()=>$("#globalSearch")?.focus(),50);
+        return;
+      case "import": $("#importFile")?.click(); return;
+      case "export": exportData(); return;
+      case "new-category": newCategory(); return;
+      case "reset": resetData(); return;
+      case "open-profile": openProfile(); return;
+      case "edit-profile": openProfileEditor(); return;
+      case "add-profile-photo": openProfilePhotoModal(); return;
+      case "restore-backup": restoreBackup(); return;
+      case "vscode-help": showVSCodeHelp(); return;
+    }
+  }
+
+  const musicCollection = target.closest("[data-music-collection]")?.dataset.musicCollection;
+  if(musicCollection){ e.preventDefault(); currentMusicCollectionId=musicCollection; renderMusicLibrary(); return; }
+
+  const musicMenuEdit = target.closest("[data-music-menu-edit]")?.dataset.musicMenuEdit;
+  if(musicMenuEdit){ e.preventDefault(); openMusicCollectionModal(musicMenuEdit); return; }
+
+  const musicMenuDelete = target.closest("[data-music-menu-delete]")?.dataset.musicMenuDelete;
+  if(musicMenuDelete){ e.preventDefault(); deleteMusicCollection(musicMenuDelete); return; }
+
+  const musicEdit = target.closest("[data-music-edit]")?.dataset.musicEdit;
+  if(musicEdit){ e.preventDefault(); openMusicModal(musicEdit); return; }
+
+  const musicDelete = target.closest("[data-music-delete]")?.dataset.musicDelete;
+  if(musicDelete){ e.preventDefault(); deleteMusic(musicDelete); return; }
+
+  const imageCollection = target.closest("[data-image-collection]")?.dataset.imageCollection;
+  if(imageCollection){ e.preventDefault(); currentImageCollectionId=imageCollection; renderImagesGallery(); return; }
+
+  const imageCollectionEdit = target.closest("[data-image-collection-edit]")?.dataset.imageCollectionEdit;
+  if(imageCollectionEdit){ e.preventDefault(); openImageCollectionModal(imageCollectionEdit); return; }
+
+  const imageCollectionDelete = target.closest("[data-image-collection-delete]")?.dataset.imageCollectionDelete;
+  if(imageCollectionDelete){ e.preventDefault(); deleteImageCollection(imageCollectionDelete); return; }
+
+  const historyMenu = target.closest("[data-history-menu]")?.dataset.historyMenu;
+  if(historyMenu){ e.preventDefault(); openHistoryMenu(historyMenu); return; }
+
+  const historyMenuEdit = target.closest("[data-history-menu-edit]")?.dataset.historyMenuEdit;
+  if(historyMenuEdit){ e.preventDefault(); openHistoryMenuModal(historyMenuEdit); return; }
+
+  const historyMenuDelete = target.closest("[data-history-menu-delete]")?.dataset.historyMenuDelete;
+  if(historyMenuDelete){ e.preventDefault(); deleteHistoryMenu(historyMenuDelete); return; }
+
+  const historyEdit = target.closest("[data-history-edit]")?.dataset.historyEdit;
+  if(historyEdit){ e.preventDefault(); openHistoryModal(historyEdit); return; }
+
+  const historyDelete = target.closest("[data-history-delete]")?.dataset.historyDelete;
+  if(historyDelete){ e.preventDefault(); deleteHistoryItem(historyDelete); return; }
+
+  const empireEdit = target.closest("[data-empire-edit]")?.dataset.empireEdit;
+  if(empireEdit){ e.preventDefault(); openEmpireModal(empireEdit); return; }
+
+  const empireDelete = target.closest("[data-empire-delete]")?.dataset.empireDelete;
+  if(empireDelete){ e.preventDefault(); deleteEmpireItem(empireDelete); return; }
+
+  const imageView = target.closest("[data-image-view]")?.dataset.imageView;
+  if(imageView){ e.preventDefault(); openImageView(imageView); return; }
+
+  const imageEdit = target.closest("[data-image-edit]")?.dataset.imageEdit;
+  if(imageEdit){ e.preventDefault(); openImageModal(imageEdit); return; }
+
+  const imageDelete = target.closest("[data-image-delete]")?.dataset.imageDelete;
+  if(imageDelete){ e.preventDefault(); deleteImage(imageDelete); return; }
+
+  const open = target.closest("[data-open]")?.dataset.open;
+  if(open){ e.preventDefault(); openLink(open); return; }
+
+  const edit = target.closest("[data-edit]")?.dataset.edit;
+  if(edit){ e.preventDefault(); openLinkModal(edit); return; }
+
+  const fav = target.closest("[data-fav]")?.dataset.fav;
+  if(fav){ e.preventDefault(); toggleFavorite(fav); return; }
+
+  const del = target.closest("[data-delete]")?.dataset.delete;
+  if(del){ e.preventDefault(); deleteLink(del); return; }
+
+  const pedit = target.closest("[data-profile-photo-edit]")?.dataset.profilePhotoEdit;
+  if(pedit){ e.preventDefault(); openProfilePhotoModal(pedit); return; }
+
+  const pdel = target.closest("[data-profile-photo-delete]")?.dataset.profilePhotoDelete;
+  if(pdel){ e.preventDefault(); deleteProfilePhoto(pdel); return; }
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModals()});
+$("#globalSearch").addEventListener("input",renderView);
+$("#typeFilter").addEventListener("change",renderView);
+$("#platformFilter").addEventListener("change",renderView);
+
+$("#linkForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const id=$("#editId").value || crypto.randomUUID();
+  const old=data.links.find(x=>x.id===id);
+  const item={id,title:$("#linkTitle").value.trim(),description:$("#linkDescription").value.trim(),
+    platform:$("#linkPlatform").value,category:$("#linkCategory").value,url:$("#linkUrl").value.trim(),
+    image:pendingLinkImage || "",tags:$("#linkTags").value.split(",").map(x=>x.trim()).filter(Boolean),
+    favorite:$("#linkFavorite").checked,createdAt:old?.createdAt||Date.now(),lastOpened:old?.lastOpened||Date.now()};
+  if(old) Object.assign(old,item); else data.links.unshift(item);
+  save(); closeModals(); showWorkspace("recents");
+});
+$("#imageForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const id=$("#imageEditId").value;
+  const old=(data.images||[]).find(x=>x.id===id);
+  if(!pendingGalleryImage){ alert("Selecciona una imagen desde tu computador."); return; }
+  const item={
+    id:id||crypto.randomUUID(),
+    title:$("#imageTitle").value.trim(),
+    description:$("#imageDescription").value.trim(),
+    collectionId:$("#imageCollection").value || currentImageCollectionId || "",
+    collectionName:(data.imageCollections||[]).find(c=>c.id===($("#imageCollection").value || currentImageCollectionId))?.name || "",
+    category:$("#imageCategory").value,
+    url:pendingGalleryImage,
+    createdAt:old?.createdAt||Date.now()
+  };
+  if(old) Object.assign(old,item); else data.images.unshift(item);
+  currentImageCollectionId=item.collectionId||null;
+  save(); closeModals(); showWorkspace("category","Imágenes");
+});
+
+$("#imageCollectionForm").addEventListener("submit",e=>{
+  e.preventDefault(); const id=$("#imageCollectionEditId").value||crypto.randomUUID(); const old=(data.imageCollections||[]).find(x=>x.id===id);
+  const name=$("#imageCollectionTitle").value.trim(); if(!name)return;
+  if((data.imageCollections||[]).some(x=>x.id!==id&&x.name.toLowerCase()===name.toLowerCase())){alert("Ya existe un menú con ese nombre.");return;}
+  const item={id,name,icon:$("#imageCollectionIcon").value.trim()||"👤",description:$("#imageCollectionDescription").value.trim()||`Solo muestra las imágenes de ${name}.`};
+  if(old)Object.assign(old,item);else{data.imageCollections=data.imageCollections||[];data.imageCollections.push(item);} save();closeModals();currentImageCollectionId=id;renderImagesGallery();
+});
+$("#musicFile").addEventListener("change",async e=>{const file=e.target.files[0];if(!file)return;try{pendingMusicFile=await fileToDataUrl(file);const a=$("#musicPreview");a.src=pendingMusicFile;a.classList.remove("hidden");}catch{alert("No se pudo cargar el audio.");}});
+$("#musicForm").addEventListener("submit",e=>{
+  e.preventDefault(); const id=$("#musicEditId").value||crypto.randomUUID(); const old=(data.music.items||[]).find(x=>x.id===id); const cid=$("#musicCollection").value||""; const col=(data.music.collections||[]).find(c=>c.id===cid);
+  const item={id,title:$("#musicTitle").value.trim(),artist:$("#musicArtist").value.trim(),url:pendingMusicFile||"",collectionId:cid,collectionName:col?.name||"",createdAt:old?.createdAt||Date.now()};
+  if(!item.title||!item.url){alert("Indica un nombre y selecciona un archivo de audio.");return;}
+  if(old)Object.assign(old,item);else data.music.items.unshift(item);save();closeModals();currentMusicCollectionId=cid||null;renderMusicLibrary();
+});
+$("#musicCollectionForm").addEventListener("submit",e=>{
+  e.preventDefault(); const id=$("#musicCollectionEditId").value||crypto.randomUUID(); const old=(data.music.collections||[]).find(x=>x.id===id); const name=$("#musicCollectionTitle").value.trim(); if(!name)return;
+  const item={id,name,icon:$("#musicCollectionIcon").value.trim()||"♫",description:$("#musicCollectionDescription").value.trim()||"Menú musical."};
+  if(old)Object.assign(old,item);else data.music.collections.push(item);save();closeModals();currentMusicCollectionId=id;renderMusicLibrary();
+});
+
+$("#historyMenuForm").addEventListener("submit",e=>{
+  e.preventDefault(); const id=$("#historyMenuEditId").value||crypto.randomUUID(); const old=(data.history.menus||[]).find(x=>x.id===id);
+  const name=$("#historyMenuTitle").value.trim(); if(!name)return;
+  if((data.history.menus||[]).some(x=>x.id!==id&&x.name.toLowerCase()===name.toLowerCase())){alert("Ya existe un menú de historia con ese nombre.");return;}
+  const item={id,name,icon:$("#historyMenuIcon").value.trim()||"📁",description:$("#historyMenuDescription").value.trim()||"Menú de historia.",parentId:old?.parentId||currentHistoryMenuId||""};
+  if(old)Object.assign(old,item); else data.history.menus.push(item); save(); closeModals(); currentHistoryMenuId=id; renderHistory();
+});
+$("#historyForm").addEventListener("submit",e=>{
+  e.preventDefault();const id=$("#historyEditId").value||crypto.randomUUID();const old=(data.history.items||[]).find(x=>x.id===id);
+  const item={id,type:$("#historyType").value,title:$("#historyTitle").value.trim(),description:$("#historyDescription").value.trim(),image:pendingHistoryImage||"",menuId:$("#historyMenuSelect").value||"",createdAt:old?.createdAt||Date.now()};
+  if(old)Object.assign(old,item);else data.history.items.unshift(item);save();closeModals();showWorkspace("category","Historia");
+});
+$("#empireForm").addEventListener("submit",e=>{
+  e.preventDefault();const id=$("#empireEditId").value||crypto.randomUUID();const old=(data.empire.items||[]).find(x=>x.id===id);
+  const item={id,type:$("#empireType").value,title:$("#empireTitle").value.trim(),description:$("#empireDescription").value.trim(),image:pendingEmpireImage||"",createdAt:old?.createdAt||Date.now()};
+  if(old)Object.assign(old,item);else data.empire.items.unshift(item);save();closeModals();showWorkspace("category","Imperio");
+});
+
+
+function emptyState(title,description){return `<div class="empty"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(description)}</span></div>`;}
+function linkCard(x){return `<article class="card"><div class="card-cover" style="${x.image?`background-image:url('${escapeHtml(x.image)}'),url('${LOCAL_IMAGE_FALLBACK}');background-size:cover;background-position:center`:''}">${x.image?'':'🔗'}</div><div class="card-body"><span class="badge">${escapeHtml(x.category||'Otros')}</span><h3>${escapeHtml(x.title)}</h3><p>${escapeHtml(x.description||'Sin descripción.')}</p><div class="meta"><span class="tag">${escapeHtml(x.platform||'Otros')}</span></div><div class="card-actions"><button class="small-btn" data-open="${escapeHtml(x.id)}">Abrir</button><button class="small-btn" data-edit="${escapeHtml(x.id)}">Editar</button><button class="small-btn" data-fav="${escapeHtml(x.id)}">${x.favorite?'★':'☆'}</button><button class="small-btn danger" data-delete="${escapeHtml(x.id)}">Eliminar</button></div></div></article>`;}
+function imageCard(x){return `<article class="card image-card"><div class="card-cover" style="background-image:url('${escapeHtml(x.url||x.image||LOCAL_IMAGE_FALLBACK)}'),url('${LOCAL_IMAGE_FALLBACK}');background-size:cover;background-position:center"></div><div class="card-body"><span class="badge">${escapeHtml(x.collectionName||'Sin menú')}</span><h3>${escapeHtml(x.title)}</h3><p>${escapeHtml(x.description||'')}</p><div class="meta"><span class="tag">${escapeHtml(x.category||'Otros')}</span></div><div class="card-actions"><button class="small-btn" data-image-view="${escapeHtml(x.id)}">Ver</button><button class="small-btn" data-image-edit="${escapeHtml(x.id)}">Editar</button><button class="small-btn danger" data-image-delete="${escapeHtml(x.id)}">Eliminar</button></div></div></article>`;}
+function renderMusicLibrary(){
+  const m=data.music||defaultData.music; m.collections=m.collections||[]; m.items=m.items||[];
+  const active=m.collections.find(c=>c.id===currentMusicCollectionId)||null;
+  const items=active?m.items.filter(x=>x.collectionId===active.id):m.items;
+  const menus=m.collections.map(c=>`<div class="music-menu-card"><button class="music-menu-open" data-music-collection="${escapeHtml(c.id)}"><span>${escapeHtml(c.icon||"♫")}</span><h3>${escapeHtml(c.name)}</h3><p>${escapeHtml(c.description||"")}</p><small>${m.items.filter(x=>x.collectionId===c.id).length} canción(es)</small></button><div class="music-menu-actions"><button class="small-btn" data-music-menu-edit="${escapeHtml(c.id)}">Editar</button><button class="small-btn danger" data-music-menu-delete="${escapeHtml(c.id)}">Eliminar</button></div></div>`).join("");
+  const cards=items.map(x=>`<article class="card music-card"><div class="music-art">♫</div><div class="card-body"><span class="badge">${escapeHtml(active?.name||x.collectionName||"Música")}</span><h3>${escapeHtml(x.title)}</h3><p>${escapeHtml(x.artist||"Sin artista")}</p>${x.url?`<audio controls preload="metadata" src="${escapeHtml(x.url)}"></audio>`:""}<div class="card-actions"><button class="small-btn" data-music-edit="${escapeHtml(x.id)}">Editar</button><button class="small-btn danger" data-music-delete="${escapeHtml(x.id)}">Eliminar</button></div></div></article>`).join("");
+  if(!active){
+    $("#content").innerHTML=`<div class="special-hero music-hero"><div><span class="special-kicker">♫ ARCHIVO MUSICAL</span><h2>Música</h2><p>${escapeHtml(m.intro||"")}</p></div><div class="special-actions"><button class="primary-btn" data-action="new-music-menu">＋ Nuevo menú</button><button class="small-btn" data-action="add-music">＋ Canción</button></div></div><div class="category-grid music-menu-grid">${menus||emptyState("No hay menús de música.","Crea un menú para empezar.")}</div><div class="cards special-grid">${cards||""}</div>`;
+    return;
+  }
+  $("#content").innerHTML=`<div class="section-head"><div><button class="small-btn" data-action="back-music-menus">← Menús</button><h2>${escapeHtml(active.icon||"♫")} ${escapeHtml(active.name)}</h2><p>${items.length} canción(es).</p></div><button class="primary-btn" data-action="add-music">＋ Agregar canción</button></div><div class="cards special-grid">${cards||emptyState("No hay canciones aquí.","Sube un archivo de audio desde tu dispositivo.")}</div>`;
+}
+
+function openMusicModal(id=null){
+  const x=(data.music?.items||[]).find(a=>a.id===id);
+  $("#musicModal").classList.remove("hidden"); $("#musicModalTitle").textContent=id?"Editar canción":"Agregar canción";
+  $("#musicEditId").value=id||""; $("#musicTitle").value=x?.title||""; $("#musicArtist").value=x?.artist||"";
+  $("#musicCollection").innerHTML=`<option value="">Sin menú</option>`+(data.music.collections||[]).map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join("");
+  $("#musicCollection").value=x?.collectionId||currentMusicCollectionId||""; $("#musicFile").value=""; pendingMusicFile=x?.url||"";
+  const a=$("#musicPreview"); if(pendingMusicFile){a.src=pendingMusicFile;a.classList.remove("hidden");}else{a.removeAttribute("src");a.classList.add("hidden");}
+}
+function openMusicCollectionModal(id=null){const c=(data.music.collections||[]).find(x=>x.id===id);$("#musicCollectionModal").classList.remove("hidden");$("#musicCollectionEditId").value=id||"";$("#musicCollectionTitle").value=c?.name||"";$("#musicCollectionIcon").value=c?.icon||"♫";$("#musicCollectionDescription").value=c?.description||"";}
+function deleteMusicCollection(id){const c=(data.music.collections||[]).find(x=>x.id===id);if(!c)return;if(!confirm(`¿Eliminar el menú “${c.name}”? Las canciones no se borrarán.`))return;(data.music.items||[]).forEach(x=>{if(x.collectionId===id){x.collectionId="";x.collectionName="";}});data.music.collections=data.music.collections.filter(x=>x.id!==id);currentMusicCollectionId=null;save();renderMusicLibrary();}
+function deleteMusic(id){if(!confirm("¿Eliminar esta canción?"))return;data.music.items=data.music.items.filter(x=>x.id!==id);save();renderMusicLibrary();}
+
+function renderCategories(){
+  const fixed=[['Historia','📜','Capítulos, sagas, temporadas y etapas'],['Imperio','👑','Empresas, hoteles, islas y propiedades'],['Menús','▦','Tus menús personalizados'],['YouTube','▶','Videos de YouTube'],['Anime','◈','Videos y colecciones de anime'],['Películas','◉','Películas y series'],['Imágenes','🖼️','Menús independientes de fotografías'],['Música','♫','Música subida desde tu dispositivo'],['Recursos','◆','Herramientas, sitios y utilidades'],['Redes Sociales','◎','Redes y perfiles'],['Otros','◈','Otros enlaces']];
+  const custom=data.customCategories||[];
+  $("#content").innerHTML=`<div class="section-head"><div><h2>📚 Menús</h2><p>Accede a cada módulo desde su propio menú.</p></div><button class="primary-btn" data-action="new-category">＋ Nuevo menú</button></div><div class="category-grid">${fixed.map(([name,icon,desc])=>name==='Menús'?`<button class="category" data-view="categories"><span class="category-icon">${icon}</span><h3>${escapeHtml(name)}</h3><p>${escapeHtml(desc)}</p></button>`:`<button class="category" data-category="${escapeHtml(name)}"><span class="category-icon">${icon}</span><h3>${escapeHtml(name)}</h3><p>${escapeHtml(desc)}</p></button>`).join('')}${custom.map(c=>`<div class="category custom-category"><button data-category="${escapeHtml(c.name)}"><span class="category-icon">✦</span><h3>${escapeHtml(c.name)}</h3><p>${escapeHtml(c.description||'Categoría personalizada')}</p></button></div>`).join('')}</div>`;
+}
+function renderSettings(){
+  $("#content").innerHTML=`<div class="special-hero"><div><span class="special-kicker">⚙️ CONFIGURACIÓN</span><h2>Configuración de WEB LIBRARY</h2><p>Gestiona copias, importación y herramientas de la biblioteca.</p></div></div><div class="cards special-grid"><article class="card special-card"><div class="card-body"><h3>💾 Copia de seguridad</h3><p>Exporta toda la información de la biblioteca a un archivo JSON.</p><button class="primary-btn" data-action="export">Exportar</button></div></article><article class="card special-card"><div class="card-body"><h3>📥 Importar</h3><p>Restaura una copia JSON previamente exportada.</p><button class="primary-btn" data-action="import">Importar</button></div></article><article class="card special-card"><div class="card-body"><h3>↩️ Copia anterior</h3><p>Recupera la última copia automática disponible.</p><button class="small-btn" data-action="restore-backup">Restaurar</button></div></article><article class="card special-card"><div class="card-body"><h3>💻 Visual Studio Code</h3><p>Abre el proyecto local para editar sus archivos.</p><button class="small-btn" data-action="vscode-help">Ayuda</button></div></article><article class="card special-card"><div class="card-body"><h3>⚠️ Restablecer</h3><p>Elimina los datos guardados en este navegador.</p><button class="small-btn danger" data-action="reset">Restablecer</button></div></article></div>`;
+}
+function openLinkModal(id=null){const x=data.links.find(a=>a.id===id);$("#linkModal").classList.remove('hidden');$("#linkModalTitle").textContent=id?'Editar página':'Agregar página';$("#editId").value=id||'';$("#linkTitle").value=x?.title||'';$("#linkDescription").value=x?.description||'';$("#linkPlatform").value=x?.platform||'Otros';$("#linkCategory").value=x?.category||'Otros';$("#linkUrl").value=x?.url||'';$("#linkTags").value=(x?.tags||[]).join(', ');$("#linkFavorite").checked=!!x?.favorite;pendingLinkImage=x?.image||'';$("#linkImageFile").value='';setPreview('#linkImagePreview',pendingLinkImage);}
+function openImageModal(id=null){const x=(data.images||[]).find(a=>a.id===id);$("#imageModal").classList.remove('hidden');$("#imageModalTitle").textContent=id?'Editar imagen':'Agregar imagen';$("#imageEditId").value=id||'';$("#imageTitle").value=x?.title||'';$("#imageDescription").value=x?.description||'';$("#imageCategory").value=x?.category||'Otros';$("#imageCollection").innerHTML=`<option value="">Sin menú</option>`+(data.imageCollections||[]).map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');$("#imageCollection").value=x?.collectionId||currentImageCollectionId||'';pendingGalleryImage=x?.url||x?.image||'';$("#imageFile").value='';setPreview('#imagePreview',pendingGalleryImage);}
+function openImageView(id){const x=(data.images||[]).find(a=>a.id===id);if(!x)return;$("#imageViewModal").classList.remove('hidden');$("#imageViewFull").src=x.url||x.image||'';$("#imageViewTitle").textContent=x.title||'';$("#imageViewDescription").textContent=x.description||'';$("#imageViewCollection").textContent=x.collectionName||'Sin menú';$("#imageViewCategory").textContent=x.category||'Otros';}
+function openImageCollectionModal(id=null){const c=(data.imageCollections||[]).find(x=>x.id===id);$("#imageCollectionModal").classList.remove('hidden');$("#imageCollectionModalTitle").textContent=id?'Editar menú de imágenes':'Nuevo menú de imágenes';$("#imageCollectionEditId").value=id||'';$("#imageCollectionTitle").value=c?.name||'';$("#imageCollectionIcon").value=c?.icon||'👤';$("#imageCollectionDescription").value=c?.description||'';}
+function createImageCollection(){openImageCollectionModal();}
+function deleteImageCollection(id){const c=(data.imageCollections||[]).find(x=>x.id===id);if(!c)return;if(!confirm(`¿Eliminar el menú “${c.name}”? Las imágenes no se borrarán; quedarán sin menú.`))return;(data.images||[]).forEach(x=>{if(x.collectionId===id){x.collectionId='';x.collectionName='';}});data.imageCollections=data.imageCollections.filter(x=>x.id!==id);if(currentImageCollectionId===id)currentImageCollectionId=null;save();renderImagesGallery();}
+function openLink(id){const x=data.links.find(a=>a.id===id);if(!x)return;x.lastOpened=Date.now();save();window.open(safeUrl(x.url),'_blank','noopener');}
+function showProfileFromHome(){openProfile();}
+
+function linesToArray(value){
+  return String(value||"").split(/\n+/).map(x=>x.trim()).filter(Boolean);
+}
+function arrayToLines(arr){ return (arr||[]).join("\n"); }
+function renderStatsEditor(){
+  const stats=(data.profile?.stats||[]);
+  $("#profileStatsEditor").innerHTML=stats.map((st,i)=>`<div class="stat-editor-row"><input data-stat-name="${i}" value="${escapeHtml(st.name||"")}" placeholder="Nombre"><input data-stat-value="${i}" type="number" min="0" max="999999" value="${Number(st.value)||0}" placeholder="Valor"><button type="button" class="small-btn danger" data-stat-delete="${i}">Eliminar</button></div>`).join("")+`<button type="button" class="small-btn" id="addStatBtn">＋ Agregar atributo</button>`;
+  $$("[data-stat-delete]").forEach(btn=>btn.addEventListener("click",()=>{const i=Number(btn.dataset.statDelete); data.profile.stats.splice(i,1); renderStatsEditor();}));
+  $("#addStatBtn")?.addEventListener("click",()=>{data.profile.stats.push({name:"Nuevo atributo",value:0});renderStatsEditor();});
+}
+function renderCustomSectionsEditor(){
+  const list=data.profile?.customSections||[];
+  $("#customSectionsEditor").innerHTML=list.map((sec,i)=>`<div class="custom-editor-item"><div class="two-col"><label>Título<input data-custom-title="${i}" value="${escapeHtml(sec.title||"")}"></label><label>Icono<input data-custom-icon="${i}" value="${escapeHtml(sec.icon||"✦")}"></label></div><label>Contenido<textarea data-custom-content="${i}" rows="4">${escapeHtml(sec.content||"")}</textarea></label><button type="button" class="small-btn danger" data-custom-delete="${i}">🗑️ Eliminar sección</button></div>`).join("");
+  $$("[data-custom-delete]").forEach(btn=>btn.addEventListener("click",()=>{const i=Number(btn.dataset.customDelete);data.profile.customSections.splice(i,1);renderCustomSectionsEditor();}));
+}
+function readStatsEditor(){
+  return $$(".stat-editor-row").map(row=>({name:row.querySelector("[data-stat-name]")?.value.trim()||"Atributo",value:Number(row.querySelector("[data-stat-value]")?.value)||0}));
+}
+$("#profileEditForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const p=data.profile||structuredClone(defaultData.profile);
+  p.name=$("#profileEditName").value.trim()||"Akira Ren";
+  p.subtitle=$("#profileEditSubtitle").value.trim();
+  p.biography=$("#profileEditBiography").value.trim();
+  p.title=$("#profileEditTitle").value.trim();
+  p.titleDescription=$("#profileEditTitleDescription").value.trim();
+  p.libraryDescription=$("#profileEditLibraryDescription").value.trim();
+  p.identity={level:$("#profileEditLevel").value.trim(),className:$("#profileEditClass").value.trim(),age:$("#profileEditAge").value.trim(),species:$("#profileEditSpecies").value.trim(),alignment:$("#profileEditAlignment").value.trim()};
+  p.stats=readStatsEditor();
+  p.powers=linesToArray($("#profileEditPowers").value);
+  p.skills=linesToArray($("#profileEditSkills").value);
+  p.characteristics=linesToArray($("#profileEditCharacteristics").value);
+  p.life=linesToArray($("#profileEditLife").value);
+  p.equipment=linesToArray($("#profileEditEquipment").value);
+  p.achievements=linesToArray($("#profileEditAchievements").value);
+  p.customSections=$$(".custom-editor-item").map((el,i)=>({id:p.customSections?.[i]?.id||crypto.randomUUID(),title:el.querySelector("[data-custom-title]")?.value.trim()||"Nueva sección",icon:el.querySelector("[data-custom-icon]")?.value.trim()||"✦",content:el.querySelector("[data-custom-content]")?.value.trim()||""}));
+  const file=$("#profileCharacterImageFile").files[0];
+  if(file){ try{p.characterImage=await compressImage(file,1600,.84);}catch{alert("No se pudo cargar la imagen principal.");return;} }
+  data.profile=p;
+  save(); closeModals(); openProfile();
+});
+
+$("#addCustomSectionBtn").addEventListener("click",()=>{data.profile=data.profile||structuredClone(defaultData.profile);data.profile.customSections=data.profile.customSections||[];data.profile.customSections.push({id:crypto.randomUUID(),title:"Nueva sección",icon:"✦",content:"Escribe aquí la información del personaje."});renderCustomSectionsEditor();});
+
+$("#profileCharacterImageFile").addEventListener("change",async e=>{
+  const file=e.target.files[0]; if(!file)return;
+  try{const preview=await compressImage(file,1600,.84);$("#profileCharacterImagePreview").src=preview;}catch{alert("No se pudo previsualizar la imagen.");}
+});
+
+$("#profilePhotoFile").addEventListener("change",async e=>{
+  const file=e.target.files[0]; if(!file)return;
+  try{pendingProfilePhoto=await compressImage(file);$("#profilePhotoPreview").src=pendingProfilePhoto;$("#profilePhotoPreview").classList.remove("hidden");}
+  catch(err){alert("No se pudo cargar esa foto.");}
+});
+$("#profilePhotoForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  if(!pendingProfilePhoto){alert("Selecciona una foto.");return;}
+  data.profile=data.profile||structuredClone(defaultData.profile); data.profile.photos=data.profile.photos||[];
+  const id=$("#profilePhotoEditId").value; const old=data.profile.photos.find(x=>x.id===id);
+  const item={id:id||crypto.randomUUID(),title:$("#profilePhotoTitle").value.trim()||"Foto de Akira Ren",description:$("#profilePhotoDescription").value.trim(),image:pendingProfilePhoto,createdAt:old?.createdAt||Date.now()};
+  if(old) Object.assign(old,item); else data.profile.photos.unshift(item);
+  save(); closeModals(); openProfile();
+});
+
+$("#importFile").addEventListener("change",e=>{
+  const file=e.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{try{const x=JSON.parse(reader.result);const imported=x.data||x;if(!imported.links)throw Error();data={...structuredClone(defaultData),...imported};save();showWorkspace("settings");alert("Biblioteca importada correctamente.");}catch{alert("El archivo no tiene un formato válido.");}};
+  reader.readAsText(file); e.target.value="";
+});
+
+function renderProfileStats(){
+  const stats=data.profile?.stats||[];
+  $("#profileStats").innerHTML=stats.map(st=>`<div class="stat-bar"><div class="stat-label"><span>${escapeHtml(st.name)}</span><b>${escapeHtml(st.value)}</b></div><div class="bar"><i style="width:${Math.min(100,Math.max(0,Number(st.value)||0))}%"></i></div></div>`).join("");
+}
+function renderChipList(selector,items,icon="◆"){
+  $(selector).innerHTML=(items||[]).map(x=>`<span class="profile-chip">${icon} ${escapeHtml(x)}</span>`).join("")||`<span class="muted">Sin registros.</span>`;
+}
+function renderProfileTimeline(){
+  $("#profileLife").innerHTML=(data.profile?.life||[]).map((x,i)=>`<div class="timeline-item"><span>${String(i+1).padStart(2,"0")}</span><p>${escapeHtml(x)}</p></div>`).join("")||`<span class="muted">Sin etapas registradas.</span>`;
+}
+function renderProfileAchievements(){
+  $("#profileAchievements").innerHTML=(data.profile?.achievements||[]).map((x,i)=>`<article class="achievement-card"><strong>🏆 ${String(i+1).padStart(2,"0")}</strong><p>${escapeHtml(x)}</p></article>`).join("")||`<span class="muted">Sin logros registrados.</span>`;
+}
+function renderProfileCustomSections(){
+  const list=data.profile?.customSections||[];
+  $("#profileCustomSections").innerHTML=list.length?list.map((x,i)=>`<article class="custom-profile-section"><div class="custom-section-head"><span>${escapeHtml(x.icon||"✦")}</span><h4>${escapeHtml(x.title||"Sección")}</h4></div><div>${escapeHtml(x.content||"").split(/\n+/).filter(Boolean).map(p=>`<p>${p}</p>`).join("")}</div></article>`).join(""):`<div class="empty"><strong>Archivo preparado.</strong><span>Usa “Agregar nueva sección” en Editar ficha para ampliar el personaje sin límite.</span></div>`;
+}
+function renderProfileIdentity(){
+  const id=data.profile?.identity||{};
+  const items=[['NIVEL',id.level],['CLASE',id.className],['EDAD',id.age],['ESPECIE',id.species],['ALINEACIÓN',id.alignment]];
+  $("#profileIdentity").innerHTML=items.map(([a,b])=>`<div class="identity-item"><small>${a}</small><strong>${escapeHtml(b||"—")}</strong></div>`).join("");
+}
+function openProfile(){
+  const p=data.profile||defaultData.profile;
+  $("#profileModal").classList.remove("hidden");
+  $("#profileCharacterImage").src=p.characterImage||"Akira Ren - Ficha del Personaje.png";
+  $("#profileName").textContent=p.name||"Akira Ren";
+  $("#profileSubtitle").textContent=p.subtitle||"Soberano de tu mundo digital 👑";
+  $("#profileBiography").innerHTML=(p.biography||"").split(/\n+/).filter(Boolean).map(x=>`<p>${escapeHtml(x)}</p>`).join("");
+  $("#profileTitle").textContent=p.title||"Guardián Nocturno";
+  $("#profileTitleDescription").textContent=p.titleDescription||"";
+  $("#profileLibraryDescription").textContent=p.libraryDescription||"";
+  $("#profileLinks").textContent=data.links.length;
+  $("#profileFavorites").textContent=data.links.filter(x=>x.favorite).length;
+  $("#profileImages").textContent=data.images.length+(p.photos||[]).length;
+  renderProfileIdentity(); renderProfileStats();
+  renderChipList("#profilePowers",p.powers,"⚡");
+  renderChipList("#profileSkills",p.skills,"◈");
+  renderChipList("#profileCharacteristics",p.characteristics,"✦");
+  renderChipList("#profileEquipment",p.equipment,"♜");
+  renderProfileTimeline(); renderProfileAchievements(); renderProfileCustomSections(); renderProfilePhotos();
+}
+function openProfileEditor(){
+  const p=data.profile||defaultData.profile;
+  $("#profileEditModal").classList.remove("hidden");
+  $("#profileEditName").value=p.name||"";
+  $("#profileEditSubtitle").value=p.subtitle||"";
+  $("#profileEditLevel").value=p.identity?.level||"";
+  $("#profileEditClass").value=p.identity?.className||"";
+  $("#profileEditAge").value=p.identity?.age||"";
+  $("#profileEditSpecies").value=p.identity?.species||"";
+  $("#profileEditAlignment").value=p.identity?.alignment||"";
+  $("#profileEditBiography").value=p.biography||"";
+  $("#profileEditTitle").value=p.title||"";
+  $("#profileEditTitleDescription").value=p.titleDescription||"";
+  $("#profileEditLibraryDescription").value=p.libraryDescription||"";
+  $("#profileEditPowers").value=arrayToLines(p.powers);
+  $("#profileEditSkills").value=arrayToLines(p.skills);
+  $("#profileEditCharacteristics").value=arrayToLines(p.characteristics);
+  $("#profileEditLife").value=arrayToLines(p.life);
+  $("#profileEditEquipment").value=arrayToLines(p.equipment);
+  $("#profileEditAchievements").value=arrayToLines(p.achievements);
+  $("#profileCharacterImageFile").value="";
+  $("#profileCharacterImagePreview").src=p.characterImage||"Akira Ren - Ficha del Personaje.png";
+  renderStatsEditor(); renderCustomSectionsEditor();
+}
+function renderProfilePhotos(){
+  const photos=data.profile?.photos||[];
+  $("#profilePhotos").innerHTML=photos.length ? photos.map((x,i)=>`<article class="profile-photo"><img src="${escapeHtml(x.image)}" alt="${escapeHtml(x.title)}"><div class="profile-photo-body"><h4>${escapeHtml(x.title)}</h4><p>${escapeHtml(x.description||"")}</p><div class="card-actions"><button class="small-btn" data-profile-photo-edit="${x.id}">Editar</button><button class="small-btn danger" data-profile-photo-delete="${x.id}">Eliminar</button></div></div></article>`).join("") : `<div class="empty"><strong>No hay fotos en la biografía.</strong><span>Agrega la primera foto de Akira Ren.</span></div>`;
+}
+function openProfilePhotoModal(id=null){
+  const x=(data.profile?.photos||[]).find(a=>a.id===id);
+  $("#profilePhotoModal").classList.remove("hidden");
+  $("#profilePhotoEditId").value=id||"";
+  $("#profilePhotoTitle").value=x?.title||"";
+  $("#profilePhotoDescription").value=x?.description||"";
+  $("#profilePhotoFile").value="";
+  pendingProfilePhoto=x?.image||"";
+  const preview=$("#profilePhotoPreview");
+  if(pendingProfilePhoto){preview.src=pendingProfilePhoto;preview.classList.remove("hidden");}else{preview.removeAttribute("src");preview.classList.add("hidden");}
+}
+function deleteProfilePhoto(id){
+  if(!confirm("¿Eliminar esta foto de la biografía?")) return;
+  data.profile.photos=(data.profile.photos||[]).filter(x=>x.id!==id); save(); openProfile();
+}
+function restoreBackup(){
+  const old=localStorage.getItem(STORAGE_KEY+"_previous");
+  if(!old){alert("No hay una copia automática anterior disponible.");return;}
+  if(confirm("¿Restaurar la última copia automática? Los cambios actuales serán reemplazados.")){
+    try{data=JSON.parse(old);hydrateStoredImages(data).then(()=>{localStorage.setItem(STORAGE_KEY,JSON.stringify(createStorageSafeData(data)));showWorkspace("settings");alert("Copia restaurada correctamente.");});}catch{alert("La copia automática está dañada.");}
+  }
+}
+function showVSCodeHelp(){
+  alert(`PARA ABRIR LA PÁGINA EN VISUAL STUDIO CODE:
+
+1. Descomprime el ZIP.
+2. Abre Visual Studio Code.
+3. Ve a Archivo > Abrir carpeta.
+4. Selecciona la carpeta Web_Library_Akira_Ren.
+5. Abre index.html para editarla.
+
+También encontrarás un archivo .code-workspace y un .bat para facilitar la apertura en Windows.`);
+}
+function toggleFavorite(id){const x=data.links.find(a=>a.id===id);if(x){x.favorite=!x.favorite;save();renderView()}}
+function deleteLink(id){if(confirm("¿Eliminar esta página de la biblioteca?")){data.links=data.links.filter(x=>x.id!==id);save();renderView()}}
+function deleteImage(id){
+  if(!confirm("¿Eliminar esta imagen de la galería?")) return;
+  data.images=(data.images||[]).filter(x=>x.id!==id);
+  save();
+  renderView();
+}
+function newCategory(){
+  const name=prompt("Nombre de la nueva categoría:");
+  if(!name?.trim())return;
+  const description=prompt("Descripción de la categoría:")||"Categoría personalizada";
+  data.customCategories.push({name:name.trim(),description});save();renderCategories();
+}
+function exportData(){
+  const backup={version:"3.0",project:"WEB LIBRARY — Akira Ren",exportedAt:new Date().toISOString(),data};
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="web-library-akira-ren-backup.json";a.click();URL.revokeObjectURL(a.href);
+}
+function resetData(){
+  if(confirm("Esto eliminará los datos guardados en este navegador. ¿Continuar?")){data=structuredClone(defaultData);save();showWorkspace("settings")}
+}
+
+
+// Sincronización inicial: la página primero funciona localmente y después
+// sustituye los datos por la copia compartida de Supabase cuando está configurada.
+hydrateStoredImages(data).then(()=>renderView());
+initializeCloud();
+
+// Si una imagen remota falla, intentamos recuperar una copia local cuando exista.
+document.addEventListener("error", async (event)=>{
+  const el=event.target;
+  if(!(el instanceof HTMLImageElement)) return;
+  const ref=el.dataset.idbFallback;
+  if(!ref || el.dataset.fallbackTried) return;
+  el.dataset.fallbackTried="1";
+  const local=await getStoredImage(ref);
+  if(local) el.src=local;
+}, true);
